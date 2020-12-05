@@ -2,6 +2,7 @@ package hdrhistogram_test
 
 import (
 	hdrhistogram "github.com/HdrHistogram/hdrhistogram-go"
+	"math/rand"
 	"testing"
 )
 
@@ -60,5 +61,40 @@ func BenchmarkWindowedHistogramMerge(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		w.Merge()
+	}
+}
+
+func BenchmarkWindowedHistogramRotateAndMerge(b *testing.B) {
+	rnd := rand.NewSource(32)
+	minValue := int64(0)
+	maxValue := int64(10000000)
+	valuesPerHistogram := 100000
+	valueRange := maxValue - minValue
+	windowSize := 100
+	w := hdrhistogram.NewWindowed(windowSize, minValue, maxValue, 2)
+
+	for i := 0; i < windowSize; i++ {
+		for j := 0; j < valuesPerHistogram; j++ {
+			err := w.Current.RecordValue(rnd.Int63()%valueRange + minValue)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+		w.Rotate()
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		b.StartTimer()
+		w.Rotate()
+		b.StopTimer()
+		for j := 0; j < valuesPerHistogram; j++ {
+			err := w.Current.RecordValue(rnd.Int63()%valueRange + minValue)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
 	}
 }

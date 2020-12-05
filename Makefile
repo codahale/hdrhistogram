@@ -40,3 +40,6 @@ coverage: get test
 godoc:
 	$(GODOC)
 
+bench:
+	$(GOTEST) -bench=.
+

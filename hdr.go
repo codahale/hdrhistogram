@@ -184,6 +184,22 @@ func (h *Histogram) Merge(from *Histogram) (dropped int64) {
 	return
 }
 
+// Unmerge reverts merge of the data stored in the given histogram with the receiver,
+// returning the number of reverted values.
+func (h *Histogram) Unmerge(from *Histogram) (n int64) {
+	i := from.rIterator()
+	for i.next() {
+		v := i.valueFromIdx
+		c := i.countAtIdx
+
+		if h.UnrecordValues(v, c) != nil {
+			n += c
+		}
+	}
+
+	return
+}
+
 // TotalCount returns total number of values recorded.
 func (h *Histogram) TotalCount() int64 {
 	return h.totalCount
@@ -264,6 +280,12 @@ func (h *Histogram) RecordValue(v int64) error {
 	return h.RecordValues(v, 1)
 }
 
+// UnrecordValue reverts record of the given value, returning an error if the value is out
+// of range.
+func (h *Histogram) UnrecordValue(v int64) error {
+	return h.UnrecordValues(v, 1)
+}
+
 // RecordCorrectedValue records the given value, correcting for stalls in the
 // recording process. This only works for processes which are recording values
 // at an expected interval (e.g., doing jitter analysis). Processes which are
@@ -297,6 +319,19 @@ func (h *Histogram) RecordValues(v, n int64) error {
 		return fmt.Errorf("value %d is too large to be recorded", v)
 	}
 	h.setCountAtIndex(idx, n)
+
+	return nil
+}
+
+// UnrecordValues reverts record of n occurrences of the given value, returning an error if
+// the value is out of range.
+func (h *Histogram) UnrecordValues(v, n int64) error {
+	idx := h.countsIndexFor(v)
+	if idx < 0 || int(h.countsLen) <= idx {
+		return fmt.Errorf("value %d is too large to be unrecorded", v)
+	}
+	h.counts[idx] -= n
+	h.totalCount -= n
 
 	return nil
 }
